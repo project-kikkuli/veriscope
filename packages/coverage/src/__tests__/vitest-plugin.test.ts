@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { veriscopeCoverageReporter } from '../vitest-plugin';
@@ -111,7 +112,9 @@ describe('veriscopeCoverageReporter', () => {
 
   it('runs as a real Vitest reporter in a child Vitest process', () => {
     const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-    const tmp = mkdtempSync(join('/private/tmp', 'veriscope-vitest-reporter-'));
+    // Vite resolves symlinks; keep its root and module paths identical on macOS
+    // (/tmp -> /private/tmp) without assuming that directory exists on Linux.
+    const tmp = mkdtempSync(join(realpathSync(tmpdir()), 'veriscope-vitest-reporter-'));
     try {
       const configPath = join(tmp, 'vitest.config.mjs');
       const testPath = join(tmp, 'sample.test.ts');

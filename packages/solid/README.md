@@ -190,6 +190,13 @@ interface Signal<T> extends ReadonlySignal<T> {
 
 ## Solid-Specific Behavior vs React Bindings
 
+Calling `graph.disableInstrumentation()` leaves Solid signals, derived values,
+and effects functional; it only stops graph instrumentation. This also applies
+when instrumentation is disabled before creating the signals, or when
+`disableInstrumentation({ clear: true })` removes their graph nodes. Re-enabling
+instrumentation does not register previously untracked or cleared nodes again;
+recreate their reactive owner to restore graph tracking.
+
 The `@veriscope/solid` and `@veriscope/react` packages expose identical APIs and semantics, but their internals differ to match each framework's reactivity model:
 
 | Concern | `@veriscope/solid` | `@veriscope/react` |

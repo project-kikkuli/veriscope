@@ -6,6 +6,15 @@ import type { AutotestResult } from '@veriscope/test';
 import { generateMutations } from './operators.js';
 import type { MutateOptions, MutateProgress, MutateResult, Mutation, SkippedMutation, UnobservedMutation } from './types.js';
 
+/** The unchanged graph must satisfy its assertions before mutants can be scored. */
+export class MutationBaselineError extends Error {
+  constructor(public readonly baseline: AutotestResult) {
+    const names = [...new Set(baseline.violations.map(violation => violation.assertionName))];
+    super(`Mutation baseline failed: ${names.join(', ') || 'assertion failure'}. Fix the unchanged graph before scoring mutants.`);
+    this.name = 'MutationBaselineError';
+  }
+}
+
 const DEFAULT_SCORING_OPERATORS = new Set(['negate', 'constant-fold', 'invert-comparison']);
 
 /**
@@ -29,6 +38,7 @@ export async function mutate(
     budget: budgetPerMutation,
     name: 'mutation-baseline',
   });
+  if (baseline.status === 'failed') throw new MutationBaselineError(baseline);
   const canClassifyEquivalent = baseline.status === 'passed';
   const baselineSignature = behaviorSignature(baseline);
 

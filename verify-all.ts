@@ -7,6 +7,8 @@
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { tmpdir } from 'node:os';
+import assert from 'node:assert/strict';
 
 interface TestResult {
   package: string;
@@ -155,14 +157,47 @@ async function verify(): Promise<void> {
   // === 3. @veriscope/cli ===
   {
     const start = performance.now();
+    let captureDir: string | undefined;
     try {
-      // 3a. CLI snapshot command
-      const snapResult = await runCommand('npx', ['tsx', 'packages/cli/src/index.ts', 'snapshot', 'packages/graph/dist/index.js']);
-      const expected3a = 'snapshot output produced';
-      const actual3a = snapResult.stdout.length > 0 ? 'snapshot output produced' : `empty (code=${snapResult.code})`;
-      report('cli', 'snapshot command', expected3a, actual3a, actual3a === expected3a ? 'PASS' : 'FAIL', performance.now() - start);
+      // Capture in the process that owns the graph, then consume the artifacts
+      // through the built CLI exactly as a separate developer/CI process does.
+      const { CircuitGraph } = await import('./packages/graph/dist/index.js');
+      const { writeSnapshot } = await import('./packages/cli/dist/api.js');
+      captureDir = await fs.mkdtemp(path.join(tmpdir(), 'veriscope-cli-'));
+      const beforePath = path.join(captureDir, 'before.json');
+      const afterPath = path.join(captureDir, 'after.json');
+      const cliPath = path.resolve('packages/cli/dist/index.js');
+
+      const graph = new CircuitGraph();
+      const count = graph.registerNode({ name: 'count', type: 'signal' });
+      graph.setNodeValue(count, () => 2);
+      writeSnapshot(graph, beforePath, { harness: 'verify-all' });
+      graph.registerNode({ name: 'doubled', type: 'derived', deps: [count], computeFn: () => 4 });
+      writeSnapshot(graph, afterPath, { harness: 'verify-all' });
+
+      const validation = await runCommand(process.execPath, [cliPath, 'validate', afterPath]);
+      assert.equal(validation.code, 0, validation.stderr);
+      assert.match(validation.stdout, /^Nodes: 2$/m);
+      assert.match(validation.stdout, /^Edges: 1$/m);
+
+      const diff = await runCommand(process.execPath, [cliPath, 'diff', beforePath, afterPath]);
+      assert.equal(diff.code, 0, diff.stderr);
+      assert.equal(diff.stdout.trim(), 'Added nodes:\n  + doubled\nAdded edges:\n  + count → doubled');
+
+      // A working validator must reject malformed artifacts, not just print
+      // success-shaped output for the valid case.
+      const invalidPath = path.join(captureDir, 'invalid.json');
+      await fs.writeFile(invalidPath, '{}');
+      const invalid = await runCommand(process.execPath, [cliPath, 'validate', invalidPath]);
+      assert.equal(invalid.code, 1);
+      assert.match(invalid.stderr, /missing a nodes array/);
+
+      const expected = 'captures, validates, diffs, and rejects invalid snapshots';
+      report('cli', 'snapshot workflow', expected, expected, 'PASS', performance.now() - start);
     } catch (error) {
-      report('cli', 'snapshot command', 'runs', String(error), 'FAIL', 0);
+      report('cli', 'snapshot workflow', 'valid artifacts accepted, invalid artifacts rejected', String(error), 'FAIL', performance.now() - start);
+    } finally {
+      if (captureDir) await fs.rm(captureDir, { recursive: true, force: true });
     }
   }
 

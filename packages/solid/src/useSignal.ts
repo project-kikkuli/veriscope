@@ -53,6 +53,12 @@ export function useSignal<T>(
   const signal: Signal<T> = {
     get val() { return value(); },
     set(next: SignalNext<T>) {
+      // Instrumentation is optional; Solid still owns application state.
+      // A signal created while disabled (or cleared later) has no graph node.
+      if (!g.isInstrumentationEnabled() || !g.getNode(nodeId)) {
+        applyNext(next);
+        return;
+      }
       if (!g.isInBatch()) {
         g.beginBatch();
         try {

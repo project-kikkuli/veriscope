@@ -187,7 +187,7 @@ describe('mutate', () => {
       g.setNodeSetter(readyId, (v: boolean) => { ready = v; });
 
       const assertId = g.registerNode({ name: 'ready-required', type: 'assertion', deps: [readyId] });
-      g.setAssertionFn(assertId, () => ready, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(readyId)!.getValue!() === ready, 'always');
       return g;
     };
 
@@ -207,7 +207,7 @@ describe('mutate', () => {
 
       const assertId = g.registerNode({ name: 'a-must-be-true', type: 'assertion' });
       g.addEdge(a, assertId);
-      g.setAssertionFn(assertId, () => val === true, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(a)!.getValue!() === val, 'always');
 
       return g;
     };
@@ -268,7 +268,7 @@ describe('mutate', () => {
       });
 
       const assertId = g.registerNode({ name: 'submit-ready', type: 'assertion', deps: [derivedId] });
-      g.setAssertionFn(assertId, () => g.getNode(derivedId)!.getValue!() === true, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(derivedId)!.getValue!() === ready, 'always');
       g.propagate();
       return g;
     };
@@ -311,7 +311,7 @@ describe('mutate', () => {
       });
 
       const assertId = g.registerNode({ name: 'observed-required', type: 'assertion', deps: [observedId] });
-      g.setAssertionFn(assertId, () => observed === true, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(observedId)!.getValue!() === observed, 'always');
       return g;
     };
 
@@ -387,7 +387,7 @@ describe('mutate', () => {
       g.setNodeSetter(a, (v: boolean) => { val = v; });
 
       const assertId = g.registerNode({ name: 'a-must-be-true', type: 'assertion', deps: [a] });
-      g.setAssertionFn(assertId, () => val === true, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(a)!.getValue!() === val, 'always');
 
       return g;
     };
@@ -451,7 +451,7 @@ describe('mutate', () => {
 
       const assertId = g.registerNode({ name: 'check', type: 'assertion' });
       g.addEdge(d, assertId);
-      g.setAssertionFn(assertId, () => val === true, 'always');
+      g.setAssertionFn(assertId, () => g.getNode(a)!.getValue!() === val, 'always');
 
       return g;
     };

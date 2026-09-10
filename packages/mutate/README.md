@@ -45,7 +45,7 @@ console.log('Missing oracles:', result.unobserved);
 
 1. A reference `CircuitGraph` is created from `factory` to enumerate all possible mutations via `generateMutations`.
 2. By default, the runner scores observable semantic mutants only (`negate`, `constant-fold`, and `invert-comparison`). Broad structural operators such as `sever-edge` and `swap-edge` are still available with `operators: 'all'`, but are excluded from the default semantic score.
-3. A baseline autotest run records the unmutated behavior signature used for broad equivalent-mutant classification.
+3. A baseline autotest run checks the unchanged graph. If it fails, `mutate()` throws `MutationBaselineError` before running any mutants; existing failures cannot earn mutation credit. Otherwise, its behavior signature is used for broad equivalent-mutant classification.
 4. Mutants in the selected operator mode with no path to any declared verification sink are reported as **unobserved**, not counted as survived, and not included in the score denominator.
 5. For each observable selected mutation, a **fresh** graph is created (another `factory()` call), the mutation is applied, and the graph is explored using `@veriscope/test`'s `runAutotest()` with the full configured per-mutant budget.
 6. The runner yields to the host between mutants and calls `onProgress`, so browser devtools can repaint and remain interactive during long runs.
@@ -73,6 +73,17 @@ Run mutation testing on a reactive graph.
 Returns a `Promise<MutateResult>` with the aggregated results.
 
 ---
+
+### Baseline failures
+
+Catch the exported `MutationBaselineError` to inspect `error.baseline`, the
+complete unchanged-graph autotest result with violations and scenarios. Its
+message names the failing assertions; the devtools mutation panel displays that
+message as a failed run. No score is produced for a failed baseline.
+
+A baseline without observed failures is still bounded by the exploration
+budget. Mutation scores describe the generated scenarios, not a proof that all
+possible behavior was checked.
 
 ### `generateMutations(graph)`
 

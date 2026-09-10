@@ -908,6 +908,35 @@ describe('mountDevtools', () => {
     handle.dispose();
   });
 
+  it('shows a real mutation baseline failure without displaying a score', async () => {
+    const { mutate } = await import('@veriscope/mutate');
+    const factory = () => {
+      const graph = new CircuitGraph();
+      let value = false;
+      const input = graph.registerNode({ name: 'input', type: 'signal' });
+      graph.setNodeValue(input, () => value);
+      graph.setNodeSetter(input, next => { value = next; });
+      const assertion = graph.registerNode({ name: 'broken-baseline', type: 'assertion', deps: [input] });
+      graph.setAssertionFn(assertion, () => false, 'always');
+      return graph;
+    };
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const handle = mountDevtools(host, new CircuitGraph(), {
+      initialTab: 'mutants',
+      mutate: () => mutate(factory, { budget: 10, operators: ['negate'] }),
+    });
+    try {
+      buttonByText(host, 'Run Semantic Mutants').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushPromises();
+      expect(host.textContent).toContain('Mutation baseline failed: broken-baseline');
+      expect(host.textContent).toContain('Last run: #1 failed');
+      expect(host.textContent).not.toContain('Score: 100');
+    } finally {
+      handle.dispose();
+    }
+  });
+
   it('runs mutation callbacks and renders killed and surviving mutants', async () => {
     const graph = new CircuitGraph();
     const mutate = vi.fn(async () => mutationResult());
